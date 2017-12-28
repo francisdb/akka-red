@@ -14,6 +14,7 @@ TODO: document the needed patches (/comms, /flows, ...)
 not in any particular order
 
 * Add unit/http tests
+* ci build (travis?)
 * Actually start/run the flows (inject -> debug)
 * Implement all required websocket communications
 * See if we can host the UI ourselves (or proxy), that would avoid patching Node-RED

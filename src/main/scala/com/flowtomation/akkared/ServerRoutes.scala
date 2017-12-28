@@ -1,18 +1,20 @@
 package com.flowtomation.akkared
 
 import akka.event.Logging
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, _}
 import akka.http.scaladsl.server.directives.LogEntry
-import akka.http.scaladsl.server.{Directives, PathMatchers, Route}
+import akka.http.scaladsl.server.{Directives, Route}
 import build.BuildInfo
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import com.flowtomation.akkared.api.Comms
+import com.flowtomation.akkared.model.Flow
 import com.flowtomation.akkared.runtime.storage.FilesystemStorage
-import spray.json.DefaultJsonProtocol._
-import spray.json._
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
+import play.api.libs.json.Json
+import scala.collection.immutable.Seq
+import com.flowtomation.akkared.format.FlowsFormat._
 
-class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirectives with SprayJsonSupport{
+class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirectives with PlayJsonSupport{
 
   def requestMethodAsInfo(req: HttpRequest): LogEntry =
     LogEntry(s"${req.method.name} ${req.uri}", Logging.InfoLevel)
@@ -26,10 +28,13 @@ class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirec
               complete(HttpEntity(ContentTypes.`application/json`, storage.readFlows))
             } ~
               post {
-                entity(as[JsObject]) { flows =>
+                entity(as[(Seq[Flow], String)]) { case (flows, oldRevision) =>
+                  // TODO read header Node-RED-Deployment-Type:full
+                  // full / flows / nodes
+                  println(s"old $oldRevision")
                   onSuccess(storage.writeFlows(flows)) { revision =>
                     complete {
-                      JsObject("revision" -> JsString(revision))
+                      Json.obj("revision" -> revision)
                     }
                   }
 

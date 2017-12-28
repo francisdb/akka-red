@@ -3,7 +3,7 @@ package com.flowtomation.akkared.api
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import spray.json.{JsObject, JsString}
+import play.api.libs.json.Json
 
 object Comms {
 
@@ -25,10 +25,10 @@ object Comms {
         println(s"comms <- in text message: $tm")
 
         // this is used when an other browser redeploys the flows
-        val message = JsObject(
-          "topic" -> JsString("notification/runtime-deploy"),
-          "data" -> JsObject(
-            "revision" -> JsString("test")
+        val message = Json.obj(
+          "topic" -> "notification/runtime-deploy",
+          "data" -> Json.obj(
+            "revision" -> "test"
           )
         )
         /* TextMessage(message.toString()) :: */ TextMessage(Source.single("Hello ") ++ tm.textStream ++ Source.single("!")) :: Nil
