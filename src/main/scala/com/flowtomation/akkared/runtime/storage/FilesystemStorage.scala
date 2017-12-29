@@ -4,33 +4,33 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.security.MessageDigest
 
-import akka.stream.{IOResult, Materializer}
-import akka.stream.scaladsl.{FileIO, Source}
+import akka.stream.Materializer
+import akka.stream.scaladsl.{FileIO, Sink, Source}
 import akka.util.ByteString
 import play.api.libs.json._
-import Json._
-import com.flowtomation.akkared.model.Flow
+import com.flowtomation.akkared.model.Flows
 import com.flowtomation.akkared.format.FlowsFormat._
-import scala.collection.immutable.Seq
 
+import scala.collection.immutable.Seq
 import scala.concurrent.Future
 
 class FilesystemStorage(flowsPath: Path) {
 
-  val readFlows: Source[ByteString, Future[IOResult]] = {
-    FileIO.fromPath(flowsPath).fold(ByteString.empty)(_ ++ _).map { bytes =>
-      val jsonString = bytes.decodeString(StandardCharsets.UTF_8)
-      val flows = Json.parse(jsonString).as[JsArray]
-      val wrapped = obj(
-        "flows" -> flows,
-        "rev" -> flowsRevision(jsonString)
-      )
-      ByteString(wrapped.toString(), StandardCharsets.UTF_8)
+  def readFlows(implicit mat: Materializer): Future[(Flows, String)] = {
+    implicit val ec = mat.executionContext
+    if(flowsPath.toFile.exists()) {
+      FileIO.fromPath(flowsPath).fold(ByteString.empty)(_ ++ _).runWith(Sink.head).map { bytes =>
+        val jsonString = bytes.decodeString(StandardCharsets.UTF_8)
+        val flows = Json.parse(jsonString).as[Flows]
+        (flows, flowsRevision(jsonString))
+      }
+    }else{
+      Future.successful(Flows.empty, flowsRevision("{}"))
     }
   }
 
 
-  def writeFlows(flows: Seq[Flow])(implicit mat: Materializer): Future[String] = {
+  def writeFlows(flows: Flows)(implicit mat: Materializer): Future[String] = {
     implicit val ec = mat.executionContext
     val json = Json.toJson(flows)
     val jsonString = Json.stringify(json)

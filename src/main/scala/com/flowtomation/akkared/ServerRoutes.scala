@@ -7,14 +7,14 @@ import akka.http.scaladsl.server.{Directives, Route}
 import build.BuildInfo
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives
 import com.flowtomation.akkared.api.Comms
-import com.flowtomation.akkared.model.Flow
+import com.flowtomation.akkared.model.Flows
 import com.flowtomation.akkared.runtime.storage.FilesystemStorage
 import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import play.api.libs.json.Json
-import scala.collection.immutable.Seq
 import com.flowtomation.akkared.format.FlowsFormat._
+import com.flowtomation.akkared.nodes.core.{Debug, Inject}
 
-class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirectives with PlayJsonSupport{
+class ServerRoutes(storage: FilesystemStorage, runtime: Runtime) extends Directives with CorsDirectives with PlayJsonSupport{
 
   def requestMethodAsInfo(req: HttpRequest): LogEntry =
     LogEntry(s"${req.method.name} ${req.uri}", Logging.InfoLevel)
@@ -22,22 +22,29 @@ class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirec
   val routes: Route =
     logRequest(requestMethodAsInfo _) {
       extractMaterializer { implicit mat =>
+        implicit val ec = mat.executionContext
         cors() {
           path("flows") {
             get {
-              complete(HttpEntity(ContentTypes.`application/json`, storage.readFlows))
+              complete(storage.readFlows)
             } ~
               post {
-                entity(as[(Seq[Flow], String)]) { case (flows, oldRevision) =>
+                entity(as[(Flows, String)]) { case (flows, oldRevision) =>
                   // TODO read header Node-RED-Deployment-Type:full
                   // full / flows / nodes
                   println(s"old $oldRevision")
-                  onSuccess(storage.writeFlows(flows)) { revision =>
+                  onSuccess{
+                    for {
+                      revision <- storage.writeFlows(flows)
+                    } yield {
+                      runtime.update(flows)
+                      revision
+                    }
+                  } { revision =>
                     complete {
                       Json.obj("revision" -> revision)
                     }
                   }
-
                 }
               }
           } ~ pathPrefix("library") {
@@ -66,40 +73,12 @@ class ServerRoutes(storage: FilesystemStorage) extends Directives with CorsDirec
               // TODO
               ???
             }
-          } ~ pathPrefix("inject"){
-            path(Segment) { nodeId =>
-              // if node not found return 404 with plain text body "Not Found"
-              post{
-                // empty body
-                // TODO inject into node
-                complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "OK"))
-              }
-            }
-          } ~ pathPrefix("debug") {
-            pathPrefix(Segment) { nodeId =>
-              // if node not found return 404 with plain text body "Not Found"
-              path(Segment) { action =>
-                post {
-                  // empty body
-                  // TODO can we get this more typesafe?
-                  action match {
-                    case "disable" =>
-                      // TODO disable node
-                      complete(StatusCodes.Created, HttpEntity(ContentTypes.`text/plain(UTF-8)`, "Created"))
-                    case "enable" =>
-                      // TODO enable node
-                      complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "OK"))
-                    case other =>
-                      complete(StatusCodes.BadRequest, HttpEntity(ContentTypes.`text/plain(UTF-8)`, "Bad Request"))
-                  }
-                }
-              }
-            }
-          } ~ pathEndOrSingleSlash {
+          } ~ Debug.routes(runtime) ~ Inject.routes(runtime) ~ pathEndOrSingleSlash {
             get {
               complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, s"${BuildInfo.name} ${BuildInfo.version}"))
             }
           }
+
         }
       }
     }
