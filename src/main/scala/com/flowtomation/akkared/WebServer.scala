@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.{HttpApp, Route}
 
 import scala.util.Try
 
-class WebServer(override val routes: Route) extends HttpApp {
+class WebServer(override val routes: Route, onShutdown: => Unit) extends HttpApp {
 
   override protected def postHttpBinding(binding: Http.ServerBinding): Unit = {
     super.postHttpBinding(binding)
@@ -21,10 +21,6 @@ class WebServer(override val routes: Route) extends HttpApp {
 
   override def postServerShutdown(attempt: Try[Done], system: ActorSystem): Unit = {
     super.postServerShutdown(attempt, system)
-    cleanUpResources()
-  }
-
-  private def cleanUpResources(): Unit = {
-    println("TODO cleanup")
+    onShutdown
   }
 }

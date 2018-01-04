@@ -14,7 +14,7 @@ import play.api.libs.json.Json
 import com.flowtomation.akkared.format.FlowsFormat._
 import com.flowtomation.akkared.nodes.core.{Debug, Inject}
 
-class ServerRoutes(storage: FilesystemStorage, runtime: Runtime) extends Directives with CorsDirectives with PlayJsonSupport{
+class ServerRoutes(storage: FilesystemStorage, runtime: Runtime, comms: Comms) extends Directives with CorsDirectives with PlayJsonSupport{
 
   def requestMethodAsInfo(req: HttpRequest): LogEntry =
     LogEntry(s"${req.method.name} ${req.uri}", Logging.InfoLevel)
@@ -61,7 +61,7 @@ class ServerRoutes(storage: FilesystemStorage, runtime: Runtime) extends Directi
             }
           } ~ path("comms") {
             get {
-              handleWebSocketMessages(Comms.ws)
+              handleWebSocketMessages(comms.ws)
             }
           } ~ path("settings") {
             get {

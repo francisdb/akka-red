@@ -7,10 +7,9 @@ class Registry {
 
   // TODO add modules / nodesets
 
-
   def getNodeList: Seq[NodeType] = {
     // TODO we probably want this discovered somehow
-    Seq(Debug, Inject)
+    Seq(Comment, Debug, Delay, Inject, Status)
   }
 
   def getNode(nodeType: String): Option[NodeType] = {
